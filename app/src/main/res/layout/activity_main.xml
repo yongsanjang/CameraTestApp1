@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".MainActivity">
+
+    <Button
+        android:id="@+id/cameraOpen"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="카메라 오픈" />
+
+    <WebView
+        android:id="@+id/web_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/fileUpload"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="파일 업로드" />
+        <Button
+            android:id="@+id/fileList"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="파일리스트 출력" />
+
+        <TextView
+            android:id="@+id/tv_output_filenames"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/deleteDirectory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="All Delete" />
+
+        <Button
+            android:id="@+id/sizCompress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="File Compress" />
+
+        <Button
+            android:id="@+id/fileZip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="zip" />
+
+        <TextView
+            android:id="@+id/tv_output_zipfilename"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/recycler1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</LinearLayout>
