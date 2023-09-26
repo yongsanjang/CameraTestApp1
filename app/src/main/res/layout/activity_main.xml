@@ -7,11 +7,29 @@
     android:orientation="vertical"
     tools:context=".MainActivity">
 
-    <Button
-        android:id="@+id/cameraOpen"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="카메라 오픈" />
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/cameraOpen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="카메라 오픈" />
+
+        <Button
+            android:id="@+id/kakaomapLink"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="카카오맵 열기" />
+
+        <EditText
+            android:id="@+id/addressEt"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:hint="주소를 입력 하세요." />
+    </LinearLayout>
 
     <WebView
         android:id="@+id/web_view"
@@ -26,16 +44,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
+
         <Button
             android:id="@+id/fileUpload"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="파일 업로드" />
+
         <Button
             android:id="@+id/fileList"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="파일리스트 출력" />
+            android:text="파일리스트 출력"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tv_output_filenames"
@@ -58,13 +79,15 @@
             android:id="@+id/sizCompress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="File Compress" />
+            android:text="File Compress"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/fileZip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="zip" />
+            android:text="zip"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tv_output_zipfilename"

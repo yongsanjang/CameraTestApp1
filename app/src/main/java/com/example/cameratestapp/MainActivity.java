@@ -1,9 +1,11 @@
 package com.example.cameratestapp;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -19,8 +21,12 @@ import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,6 +38,8 @@ import com.example.cameratestapp.network.service.FileService;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -43,6 +51,7 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -52,11 +61,12 @@ import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 
-public class MainActivity extends Activity {
-    private static final int MY_CAMERA_REQUEST_CODE = 100;
+public class MainActivity extends Activity implements JavascriptBridge {
+    private static final int CAMERA_REQUEST_CODE = 100;
     private static final int REQUEST_IMAGE_CAPTURE = 1;
     private static final int REQUEST_TAKE_PHOTO = 1;
     private static final int maxFileSize = 50;
+    private static final String COMPRESS_FOLDER_NAME = "Compress";
 
     private RecyclerImageTextAdapter adapter;
     private String currentPhotoPath;
@@ -72,43 +82,8 @@ public class MainActivity extends Activity {
         init();
     }
 
-    private void fileUpload() {
-        if (observer != null && !observer.isDisposed()) {
-            observer.dispose();
-        }
-
-        observer = new DisposableObserver<String>() {
-            @Override
-            public void onNext(String msg) {
-                Log.d(MainActivity.class.getSimpleName(), msg);
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                Log.d(MainActivity.class.getSimpleName(), e.getMessage() + "");
-            }
-
-            @Override
-            public void onComplete() {
-                Log.d(MainActivity.class.getSimpleName(), "onComplete");
-            }
-        };
-
-        try {
-            File file = new File(uploadZipFilePath);
-            if (!file.exists()) {
-                Log.d(MainActivity.class.getSimpleName(), "ZipFile is not exist");
-            } else if (file.length() !=0 && (file.length()/1000/1000) > maxFileSize) {
-                Log.d(MainActivity.class.getSimpleName(), "ZipFile is big than 50MB");
-            } else {
-                ApiRequest.get().fileUpload(observer, this, file, true);
-            }
-        } catch (Exception e) {
-            e.getStackTrace();
-        }
-
-
-
+    private void fileUpload(View view) {
+        nativeFileUpload( "imgZip_0001.zip");
 //        String pathname = "/storage/emulated/0/Android/data/com.example.cameratestapp/files/Pictures/20230913_174719_7979256138469879015.jpg";
 //        String pathname = "/storage/emulated/0/Android/data/com.example.cameratestapp/files/20230912_144805.zip";
 
@@ -156,10 +131,52 @@ public class MainActivity extends Activity {
 ////                .createFormData("file","upload",progressRequestBody);
     }
 
+    private void nativeFileUpload(String fileName)  {
+        if (observer != null && !observer.isDisposed()) {
+            observer.dispose();
+        }
+
+        observer = new DisposableObserver<String>() {
+            @Override
+            public void onNext(String msg) {
+                Log.d(MainActivity.class.getSimpleName(), msg);
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                Log.d(MainActivity.class.getSimpleName(), e.getMessage() + "");
+            }
+
+            @Override
+            public void onComplete() {
+                deleteDir(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
+                getFileList();
+                Log.d(MainActivity.class.getSimpleName(), "onComplete");
+            }
+        };
+
+        try {
+
+            deleteDir(new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES).getPath() + File.separator + COMPRESS_FOLDER_NAME));
+            compress();
+            String zipFileName = fileZip(fileName);
+            File file = new File(zipFileName);
+            if (!file.exists()) {
+                Log.d(MainActivity.class.getSimpleName(), "ZipFile is not exist");
+            } else if (file.length() != 0 && (file.length() / 1000 / 1000) > maxFileSize) {
+                Log.d(MainActivity.class.getSimpleName(), "ZipFile is big than 50MB");
+            } else {
+                ApiRequest.get().fileUpload(observer, this, file, true);
+            }
+        } catch (Exception e) {
+            e.getStackTrace();
+        }
+    }
+
     private UploadProgressListener uploadProgressListener = new UploadProgressListener() {
         @Override
         public void onRequestProgress(long bytesRead, long contentLength, boolean done) {
-            Log.e("onRequestProgress","contentLength -> "+"bytesRead :"+bytesRead+",   done : "+done);
+            Log.e("onRequestProgress", "contentLength -> " + "bytesRead :" + bytesRead + ",   done : " + done);
         }
     };
 
@@ -168,34 +185,106 @@ public class MainActivity extends Activity {
         findViewById(R.id.cameraOpen).setOnClickListener(this::cameraOpen);
         findViewById(R.id.fileZip).setOnClickListener(this::fileZip);
         findViewById(R.id.fileList).setOnClickListener(this::fileList);
-        findViewById(R.id.deleteDirectory).setOnClickListener((v) -> deleteDir(getExternalFilesDir(Environment.DIRECTORY_PICTURES)));
+        findViewById(R.id.deleteDirectory).setOnClickListener((v) -> {
+            deleteDir(getExternalFilesDir(Environment.DIRECTORY_PICTURES));
+            getFileList();
+            getFileList();
+        });
         findViewById(R.id.sizCompress).setOnClickListener((v) -> compress(currentPhotoPath));
-        findViewById(R.id.fileUpload).setOnClickListener((v) -> fileUpload());
+        findViewById(R.id.fileUpload).setOnClickListener(this::fileUpload);
+        findViewById(R.id.kakaomapLink).setOnClickListener(this::kakaoMapLink);
         adapter = new RecyclerImageTextAdapter();
         ((RecyclerView) findViewById(R.id.recycler1)).setAdapter(adapter);
         ((RecyclerView) findViewById(R.id.recycler1)).setLayoutManager(new LinearLayoutManager(this));
         web_view.loadUrl("file:///android_asset/sample.html");
     }
 
+    @SuppressLint("JavascriptInterface")
     private void webViewSetting() {
         web_view = findViewById(R.id.web_view);
         WebSettings webSettings = web_view.getSettings();
         webSettings.setJavaScriptEnabled(true);
         WebView.setWebContentsDebuggingEnabled(true);
-        web_view.addJavascriptInterface(new JavascriptBridge(), "Android");
+        web_view.setWebChromeClient(new WebChromeClient() { // mWebView에 WebChromeClient를 사용하도록 설정한다.
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                return super.onJsAlert(view, url, message, result);
+            }
+        });
+        web_view.addJavascriptInterface(new WebAppInterface(web_view, new WebAppInterface.WebAppInterfaceListener() {
+            @Override
+            public String imgDelete(String src) {
+                Log.d("WebAppInterfaceListener", src);
+                JSONObject jsonObject = new JSONObject();
+                try {
+                    File file = new File(src);
+                    boolean isDelete = false;
+                    if (file.exists()) {
+                        isDelete = file.delete();
+                    }
+                    jsonObject.put("rescode", isDelete);
+                    if (isDelete) {
+                        jsonObject.put("resmsg", "삭제 되었습니다.");
+                    } else {
+                        jsonObject.put("resmsg", "삭제 실패 하였습니다.");
+                    }
+                    runOnUiThread(() -> getFileList());
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                return jsonObject.toString();
+            }
+
+            @Override
+            public String fileUpload(String zipFileName) {
+                Log.d("WebAppInterfaceListener", zipFileName);
+                JSONObject jsonObject = new JSONObject();
+                try {
+                    runOnUiThread(() -> nativeFileUpload(zipFileName));
+                    boolean isDelete = true;
+                    jsonObject.put("rescode", isDelete);
+                    if (isDelete) {
+                        jsonObject.put("resmsg", "upload 되었습니다.");
+                    } else {
+                        jsonObject.put("resmsg", "upload 실패 하였습니다.");
+                    }
+                    runOnUiThread(() -> getFileList());
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return jsonObject.toString();
+            }
+        }), "Android");
+//        web_view.addJavascriptInterface(new JavascriptBridgeImpl(this), "Android");
     }
 
     private void cameraOpen(View view) {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-            Toast.makeText(this, "camera permission enable please", Toast.LENGTH_LONG).show();
-            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getPackageName(), null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "카메라 권한이 허용되어 있습니다.", Toast.LENGTH_SHORT).show();
+            dispatchTakePictureIntent(new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()));
         } else {
-            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.CAMERA},
-                        MY_CAMERA_REQUEST_CODE);
-            } else {
-                dispatchTakePictureIntent(new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()));
-            }
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},
+                    CAMERA_REQUEST_CODE);
+        }
+    }
+
+    private void kakaoMapLink(View view) {
+        String kakaoMapPackage = "net.daum.android.map";
+        Intent installApp = getPackageManager().getLaunchIntentForPackage(kakaoMapPackage);
+        if (installApp == null) {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData((Uri.parse("market://details?id=" + kakaoMapPackage)));
+            startActivity(intent);
+        } else {
+            String url = "kakaomap://open";
+            url = "kakaomap://open?page=placeSearch";//장소 검색 입력 화면
+            url = "kakaomap://open?page=routeSearch";//길찾기 입력 화면
+            url = "kakaomap://search?q=" + ((EditText) findViewById(R.id.addressEt)).getText().toString();
+//            url = "kakaomap://search?q=맛집&p=37.537229,127.005515";
+//            url = "kakaomap://place?id=7813422";
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         }
     }
 
@@ -213,14 +302,30 @@ public class MainActivity extends Activity {
     }
 
     private void fileZip(View view) {
-        String zipFileName = getExternalFilesDir(null).getPath() + File.separator + new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".zip";
-        String zipMsg = fileZip(Environment.DIRECTORY_PICTURES+ File.separator + "Compress", zipFileName);
+        compress();
+        fileZip("imgZip_0001.zip");
+    }
+
+    private void compress() {
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        for (File f : storageDir.listFiles()) {
+            String str = f.getAbsolutePath();
+            if (!f.isDirectory()) {
+                compress(str);
+            }
+        }
+    }
+
+    private String fileZip(String fileName) {
+        String zipFileName = getExternalFilesDir(Environment.DIRECTORY_PICTURES).getPath() + File.separator + fileName;
+        String zipMsg = fileZip(Environment.DIRECTORY_PICTURES + File.separator + COMPRESS_FOLDER_NAME, zipFileName);
         if (TextUtils.isEmpty(zipMsg)) {
             File file = new File(zipFileName);
             ((TextView) findViewById(R.id.tv_output_zipfilename)).setText(zipFileName + "(" + file.length() + "bytes)");
-            uploadZipFilePath = zipFileName;
+            return zipFileName;
         } else {
             ((TextView) findViewById(R.id.tv_output_zipfilename)).setText(zipMsg);
+            return "";
         }
     }
 
@@ -239,6 +344,10 @@ public class MainActivity extends Activity {
     }
 
     private void fileList(View view) {
+        getFileList();
+    }
+
+    private void getFileList() {
         ((TextView) findViewById(R.id.tv_output_filenames)).setText(fileList(Environment.DIRECTORY_PICTURES));
     }
 
@@ -433,15 +542,16 @@ public class MainActivity extends Activity {
         try {
             InputStream is = getContentResolver().openInputStream(Uri.fromFile(new File(photoPath)));
             uploadBitmap = BitmapFactory.decodeStream(is);
-            File dir = new File(Environment.DIRECTORY_PICTURES + File.separator + "Compress");
+            File dir = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES) + File.separator + COMPRESS_FOLDER_NAME);
             if (!dir.exists()) {
                 boolean isMake = dir.mkdir();
                 Log.d("isMake", isMake + "");
+
             }
             File file = File.createTempFile(
-                    FilenameUtils.getBaseName(photoPath) + "_compress",  /* prefix */
+                    FilenameUtils.getBaseName(photoPath),  /* prefix */
                     ".jpg",         /* suffix */
-                    new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES) + File.separator + "Compress")      /* directory */
+                    new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES) + File.separator + COMPRESS_FOLDER_NAME)      /* directory */
             );
             out = new FileOutputStream(file);
             int height = uploadBitmap.getHeight();
@@ -451,6 +561,7 @@ public class MainActivity extends Activity {
                 uploadBitmap = Bitmap.createScaledBitmap(uploadBitmap, width * 1000 / height, 1000, true);
                 uploadBitmap.compress(Bitmap.CompressFormat.JPEG, 70, out);
             }
+//            Toast.makeText(this, "make compress : "+file.getPath(), Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             e.getStackTrace();
         } finally {
@@ -475,11 +586,11 @@ public class MainActivity extends Activity {
                 Bitmap imageBitmap = (Bitmap) data.getExtras().get("data");
 //                imageView.setImageBitmap(imageBitmap);
             }
-            adapter.insertItem(new RecyclerItem().setImageFullPath(currentPhotoPath));
+//            adapter.insertItem(new RecyclerItem().setImageFullPath(currentPhotoPath));
+            getFileList();
             runOnUiThread(() -> {
                 web_view.loadUrl("javascript:setImage('" + currentPhotoPath + "')");
             });
-
         }
     }
 
@@ -488,14 +599,22 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
 
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == MY_CAMERA_REQUEST_CODE) {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == CAMERA_REQUEST_CODE) {
+            if (grantResults.length == 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "camera permission granted", Toast.LENGTH_LONG).show();
             } else {
-                Toast.makeText(this, "camera permission denied", Toast.LENGTH_LONG).show();
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(this, "카메라 권한을 허용하였습니다.", Toast.LENGTH_SHORT).show();
+                } else if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                    Toast.makeText(this, "카메라 권한을 거절하였습니다.", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "카메라 권한을 다시 묻지 않음을 하였습니다.", Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getPackageName(), null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                }
+//                Toast.makeText(this, "camera permission denied", Toast.LENGTH_LONG).show();
             }
-            boolean isCameraPermission = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA);
-            Log.d("isCameraPermission", isCameraPermission + "");
+//            boolean isCameraPermission = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA);
+//            Log.d("isCameraPermission", isCameraPermission + "");
         }
     }
 
@@ -529,5 +648,17 @@ public class MainActivity extends Activity {
         if (observer != null && !observer.isDisposed()) {
             observer.dispose();
         }
+    }
+
+    @Override
+    @JavascriptInterface
+    public void log(String msg) {
+
+    }
+
+    @Override
+    @JavascriptInterface
+    public void imgDelete(String src, Object obj) {
+
     }
 }
