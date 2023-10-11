@@ -193,6 +193,7 @@ public class MainActivity extends Activity implements JavascriptBridge {
         findViewById(R.id.sizCompress).setOnClickListener((v) -> compress(currentPhotoPath));
         findViewById(R.id.fileUpload).setOnClickListener(this::fileUpload);
         findViewById(R.id.kakaomapLink).setOnClickListener(this::kakaoMapLink);
+        findViewById(R.id.outlookLink).setOnClickListener(this::outlookLink);
         adapter = new RecyclerImageTextAdapter();
         ((RecyclerView) findViewById(R.id.recycler1)).setAdapter(adapter);
         ((RecyclerView) findViewById(R.id.recycler1)).setLayoutManager(new LinearLayoutManager(this));
@@ -284,6 +285,24 @@ public class MainActivity extends Activity implements JavascriptBridge {
             url = "kakaomap://search?q=" + ((EditText) findViewById(R.id.addressEt)).getText().toString();
 //            url = "kakaomap://search?q=맛집&p=37.537229,127.005515";
 //            url = "kakaomap://place?id=7813422";
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        }
+    }
+
+    private void outlookLink(View view){
+        String outlookPackage = "com.microsoft.office.outlook";
+        Intent installApp = getPackageManager().getLaunchIntentForPackage(outlookPackage);
+        if (installApp == null) {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData((Uri.parse("market://details?id=" + outlookPackage)));
+            startActivity(intent);
+        } else {
+            String url = "ms-outlook://";
+            url = "ms-outlook://emails/inbox/focused";  //중요 메일
+            url = "ms-outlook://emails/inbox/other";    //기타 메일
+            url = "ms-outlook://events/view?action=agenda"; //아젠다
+            url = "ms-outlook://events/view?action=day";    //일 일정
+            url = "msoutlook://events/view?action=month";   //월 일정
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         }
     }
